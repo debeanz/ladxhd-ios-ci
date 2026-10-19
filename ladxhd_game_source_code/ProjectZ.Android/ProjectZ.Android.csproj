@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Main configuration. -->
+  <PropertyGroup>
+    <MonoGamePlatform>Android</MonoGamePlatform>
+    <ApplicationId>com.zelda.ladxhd</ApplicationId>
+    <ApplicationDisplayVersion>$(GameVersion)</ApplicationDisplayVersion>
+    <ApplicationVersion>$(GameVersion.Replace('.', ''))</ApplicationVersion>
+    <TargetFramework>net9.0-android</TargetFramework>
+    <RuntimeIdentifiers>android-x86;android-x64;android-arm;android-arm64</RuntimeIdentifiers>
+    <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+    <IsTrimmable>false</IsTrimmable>
+    <EnableDefaultItems>true</EnableDefaultItems>
+    <OutputPath>bin\$(Platform)\$(Configuration)\</OutputPath>
+    <TieredCompilation>false</TieredCompilation>
+    <ProjectZContentPlatform>Android</ProjectZContentPlatform>
+    <ProjectZContentOutputName>Android</ProjectZContentOutputName>
+    <ProjectZContentBeforeTargets>_ComputeAndroidAssetsPaths;CoreCompile</ProjectZContentBeforeTargets>
+    <ProjectZContentEmbedInAndroid>true</ProjectZContentEmbedInAndroid>
+  </PropertyGroup>
+
+  <!-- Release Builds: Most optimizations are disabled for compatibility packing multiple ABIs. -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <RunAOTCompilation>false</RunAOTCompilation>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <AndroidUseAssemblyStore>false</AndroidUseAssemblyStore>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+
+  <!-- Debug Builds: Configured for debugging in emulators like Bluestacks or LDPlayer both which now support Hyper-V. -->
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <AndroidLogLevel>Debug</AndroidLogLevel>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <AndroidEnableMarshalMethods>true</AndroidEnableMarshalMethods>
+  </PropertyGroup>
+
+  <!-- Include the Android files that are needed. -->
+  <ItemGroup>
+    <AndroidManifest Include="AndroidManifest.xml" />
+    <None Include="Assets\AboutAssets.txt" />
+    <None Include="Resources\AboutResources.txt" />
+    <AndroidResource Include="Resources\drawable\icon_foreground.xml" />
+    <AndroidResource Include="Resources\drawable\splash.png" />
+    <AndroidResource Include="Resources\mipmap-anydpi-v26\icon.xml" />
+    <AndroidResource Include="Resources\mipmap-anydpi-v26\icon_round.xml" />
+    <AndroidResource Include="Resources\values\icon_background.xml" />
+    <AndroidResource Include="Resources\values\strings.xml" />
+    <AndroidResource Include="Resources\values\styles.xml" />
+    <AndroidResource Include="Resources\layout\splash_layout.xml" />
+  </ItemGroup>
+
+  <!-- Include ProjectZ.Core which is the game data. -->
+  <ItemGroup>
+    <ProjectReference Include="..\ProjectZ.Core\ProjectZ.Core.csproj" />
+    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.5.1" />
+  </ItemGroup>
+
+  <!-- Android computes static asset paths before shared content-generation targets run. -->
+  <ItemGroup>
+    <AndroidAsset Include="..\ProjectZ.Core\Data\**\*"
+                  Link="Data\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <Import Project="..\ProjectZ.Content\BuildContent.targets" />
+
+  <Target Name="CopyAndroidPackageToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_SignedAndroidPackage Include="$(TargetDir)$(ApplicationId)-Signed.apk"
+                             Condition="Exists('$(TargetDir)$(ApplicationId)-Signed.apk')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SignedAndroidPackage)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_SignedAndroidPackage)' != ''" />
+  </Target>
+
+</Project>

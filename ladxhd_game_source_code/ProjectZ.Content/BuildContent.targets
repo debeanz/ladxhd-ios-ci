@@ -1,0 +1,67 @@
+<Project>
+  <PropertyGroup>
+    <ProjectZContentProject>$(MSBuildThisFileDirectory)ProjectZ.Content.csproj</ProjectZContentProject>
+    <ProjectZContentSourceDirectory>$(MSBuildThisFileDirectory)Content</ProjectZContentSourceDirectory>
+    <ProjectZContentDataDirectory>$(MSBuildThisFileDirectory)..\ProjectZ.Core\Data</ProjectZContentDataDirectory>
+    <ProjectZContentOutputDirectory>$(MSBuildThisFileDirectory)bin/$(ProjectZContentOutputName)/Content</ProjectZContentOutputDirectory>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ProjectZContentEmbedInAndroid)' != 'true'">
+    <None Include="$(ProjectZContentDataDirectory)\**\*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          TargetPath="Data\%(RecursiveDir)%(Filename)%(Extension)"
+          ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+  <Target Name="BuildProjectZContentTool" Condition="'$(TargetFramework)' != ''">
+    <MSBuild Projects="$(ProjectZContentProject)"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;TargetFramework;TargetFrameworks" />
+    <MSBuild Projects="$(ProjectZContentProject)"
+             Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;TargetFramework;TargetFrameworks">
+      <Output TaskParameter="TargetOutputs" PropertyName="ProjectZContentToolPath" />
+    </MSBuild>
+  </Target>
+
+  <Target Name="GenerateProjectZContent"
+          DependsOnTargets="BuildProjectZContentTool"
+          BeforeTargets="$(ProjectZContentBeforeTargets)"
+          Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet &quot;$(ProjectZContentToolPath)&quot; $(ProjectZContentPlatform) &quot;$(ProjectZContentSourceDirectory)&quot;"
+          StandardOutputImportance="High"
+          StandardErrorImportance="High" />
+
+    <ItemGroup Condition="'$(ProjectZContentEmbedInAndroid)' == 'true'">
+      <_GeneratedProjectZAndroidContent Include="$(ProjectZContentOutputDirectory)\**\*" />
+      <AndroidAsset Include="@(_GeneratedProjectZAndroidContent)" Link="Content\%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CopyProjectZContentToOutput"
+          DependsOnTargets="GenerateProjectZContent"
+          AfterTargets="Build"
+          Condition="'$(ProjectZContentEmbedInAndroid)' != 'true' and '$(TargetDir)' != '' and Exists('$(TargetDir)')">
+    <ItemGroup>
+      <_GeneratedProjectZContent Include="$(ProjectZContentOutputDirectory)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_GeneratedProjectZContent)"
+          DestinationFiles="@(_GeneratedProjectZContent->'$(TargetDir)Content\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyProjectZContentToPublish"
+          DependsOnTargets="GenerateProjectZContent"
+          AfterTargets="Publish"
+          Condition="'$(ProjectZContentEmbedInAndroid)' != 'true'">
+    <ItemGroup>
+      <_GeneratedProjectZContent Include="$(ProjectZContentOutputDirectory)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_GeneratedProjectZContent)"
+          DestinationFiles="@(_GeneratedProjectZContent->'$(PublishDir)Content\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

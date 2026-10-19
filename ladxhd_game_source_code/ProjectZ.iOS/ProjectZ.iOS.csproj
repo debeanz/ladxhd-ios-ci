@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-ios</TargetFramework>
+    <RuntimeIdentifier>ios-arm64</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <RootNamespace>ProjectZ.iOS</RootNamespace>
+    <AssemblyName>LADXHD</AssemblyName>
+    <ApplicationId>com.zelda.ladxhd</ApplicationId>
+    <ApplicationDisplayVersion>$(GameVersion)</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsTrimmable>false</IsTrimmable>
+    <PublishTrimmed>false</PublishTrimmed>
+    <MtouchLink>None</MtouchLink>
+    <UseInterpreter>true</UseInterpreter>
+    <EnableCodeSigning>false</EnableCodeSigning>
+    <CodesignRequireProvisioningProfile>false</CodesignRequireProvisioningProfile>
+    <BuildIpa>false</BuildIpa>
+    <ProjectZContentOutputDirectory>$(MSBuildThisFileDirectory)..\ProjectZ.Content\bin\iOS\Content</ProjectZContentOutputDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProjectZ.Core\ProjectZ.Core.csproj" />
+    <PackageReference Include="MonoGame.Framework.iOS" Version="3.8.5.1" />
+  </ItemGroup>
+
+  <!-- Game data and compiled content go into the app bundle. Content must be built first (see CI). -->
+  <ItemGroup>
+    <BundleResource Include="..\ProjectZ.Core\Data\**\*"
+                    Link="Data\%(RecursiveDir)%(Filename)%(Extension)" />
+    <BundleResource Include="$(ProjectZContentOutputDirectory)\**\*"
+                    Link="Content\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

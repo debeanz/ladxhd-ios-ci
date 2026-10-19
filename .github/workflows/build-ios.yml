@@ -1,0 +1,73 @@
+name: Build iOS (unsigned IPA)
+on:
+  workflow_dispatch:
+  push:
+    branches: [ios-port, main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Select newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Install iOS workload
+        run: dotnet workload install ios
+
+      - name: Decrypt v1.0.0 assets
+        env:
+          ASSET_PASS: ${{ secrets.ASSET_PASS }}
+        run: |
+          mkdir -p assets_original
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:ASSET_PASS -in assets.enc | tar -xz -C assets_original
+          ls assets_original
+
+      - name: Migrate assets (build migrater from source, headless)
+        run: |
+          dotnet publish ladxhd_migrate_source_code -c Release -o _mig
+          cp -R _mig/. .
+          dotnet Migrater.dll --migrate-assets
+          ls ladxhd_game_source_code/ProjectZ.Content/Content | head
+          ls ladxhd_game_source_code/ProjectZ.Core/Data | head
+
+      - name: Build content for iOS
+        run: |
+          cd ladxhd_game_source_code
+          dotnet run --project ProjectZ.Content -c Release -- iOS "$PWD/ProjectZ.Content/Content"
+          find ProjectZ.Content/bin/iOS -type f | wc -l
+
+      - name: Build app
+        run: |
+          cd ladxhd_game_source_code
+          dotnet build ProjectZ.iOS/ProjectZ.iOS.csproj -c Release -r ios-arm64 \
+            -p:EnableCodeSigning=false -p:CodesignRequireProvisioningProfile=false -p:BuildIpa=false
+
+      - name: Package unsigned IPA
+        run: |
+          APP=$(find ladxhd_game_source_code/ProjectZ.iOS/bin -name '*.app' -maxdepth 6 | head -1)
+          echo "APP=$APP"
+          mkdir -p Payload && cp -R "$APP" Payload/
+          zip -qry LADXHD-unsigned.ipa Payload
+          ls -lh LADXHD-unsigned.ipa
+
+      - name: Encrypt IPA (repo is public; artifacts are public)
+        env:
+          ASSET_PASS: ${{ secrets.ASSET_PASS }}
+        run: openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:ASSET_PASS -in LADXHD-unsigned.ipa -out LADXHD-unsigned.ipa.enc
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LADXHD-unsigned-ipa-encrypted
+          path: LADXHD-unsigned.ipa.enc
+          retention-days: 7
