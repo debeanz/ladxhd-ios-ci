@@ -68,7 +68,8 @@ jobs:
 
       - name: Select newest Xcode
         run: |
-          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          ls -d /Applications/Xcode_*.app
+          XC=/Applications/Xcode_26.2.app
           sudo xcode-select -s "$XC"
           xcodebuild -version
 
@@ -76,7 +77,8 @@ jobs:
         run: |
           cd ladxhd_game_source_code
           dotnet --version
-          dotnet workload install ios
+          echo '{"microsoft.net.sdk.ios":"26.2.9008/9.0.100"}' > /tmp/rb.json
+          dotnet workload install ios --from-rollback-file /tmp/rb.json
 
       - uses: actions/download-artifact@v4
         with:
