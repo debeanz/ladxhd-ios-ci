@@ -23,7 +23,10 @@ jobs:
           xcodebuild -version
 
       - name: Install iOS workload
-        run: dotnet workload install ios
+        run: |
+          cd ladxhd_game_source_code
+          dotnet --version
+          dotnet workload install ios
 
       - name: Decrypt v1.0.0 assets
         env:
