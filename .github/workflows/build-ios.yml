@@ -4,20 +4,70 @@ on:
   push:
     branches: [ios-port, main]
 
+# NOTE: this repo is public, so all assets/artifacts are AES-encrypted with the ASSET_PASS secret.
+
 jobs:
+  content:
+    # Shader compilation (mgfxc) needs Windows (or Wine); everything else is portable.
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Decrypt v1.0.0 assets
+        env:
+          ASSET_PASS: ${{ secrets.ASSET_PASS }}
+        run: |
+          mkdir -p assets_original
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:ASSET_PASS -in assets.enc | tar -xz -C assets_original
+
+      - name: Migrate assets to v2.0.9
+        run: |
+          dotnet publish ladxhd_migrate_source_code -c Release -o _mig -v q -nowarn:CS8618,CS8604,CS8600,CA1416
+          cp -R _mig/. .
+          ./Migrater.exe --migrate-assets
+          ls ladxhd_game_source_code/ProjectZ.Core/Data | head -5
+
+      - name: Build content for iOS
+        run: |
+          cd ladxhd_game_source_code
+          dotnet run --project ProjectZ.Content -c Release -- iOS "$PWD/ProjectZ.Content/Content" | grep -v "^\[.*succeeded\|Content/.*xnb" | tail -20
+          find ProjectZ.Content/bin/iOS -type f | wc -l
+
+      - name: Pack and encrypt
+        env:
+          ASSET_PASS: ${{ secrets.ASSET_PASS }}
+        run: |
+          cd ladxhd_game_source_code
+          tar -czf ../content.tgz -C "$PWD/ProjectZ.Content/bin/iOS" Content -C "$PWD/ProjectZ.Core" Data
+          cd ..
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:ASSET_PASS -in content.tgz -out content.enc
+          ls -lh content.enc
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: content-encrypted
+          path: content.enc
+          retention-days: 1
+
   build:
+    needs: content
     runs-on: macos-15
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
       - name: Select newest Xcode
         run: |
-          ls -d /Applications/Xcode*.app
           XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
           sudo xcode-select -s "$XC"
           xcodebuild -version
@@ -28,47 +78,37 @@ jobs:
           dotnet --version
           dotnet workload install ios
 
-      - name: Decrypt v1.0.0 assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: content-encrypted
+
+      - name: Unpack content
         env:
           ASSET_PASS: ${{ secrets.ASSET_PASS }}
         run: |
-          mkdir -p assets_original
-          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:ASSET_PASS -in assets.enc | tar -xz -C assets_original
-          ls assets_original
-
-      - name: Migrate assets (build migrater from source, headless)
-        run: |
-          dotnet publish ladxhd_migrate_source_code -c Release -o _mig -v q -nowarn:CS8618,CS8604,CS8600,CA1416
-          mv _mig/Migrater.app .
-          ls Migrater.app/Contents/MacOS | head -3
-          ./Migrater.app/Contents/MacOS/Migrater --migrate-assets
-          ls ladxhd_game_source_code/ProjectZ.Content/Content | head
-          ls ladxhd_game_source_code/ProjectZ.Core/Data | head
-
-      - name: Build content for iOS
-        run: |
-          cd ladxhd_game_source_code
-          dotnet run --project ProjectZ.Content -c Release -- iOS "$PWD/ProjectZ.Content/Content"
-          find ProjectZ.Content/bin/iOS -type f | wc -l
+          mkdir -p _c
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:ASSET_PASS -in content.enc | tar -xz -C _c
+          mkdir -p ladxhd_game_source_code/ProjectZ.Content/bin/iOS
+          cp -R _c/Content ladxhd_game_source_code/ProjectZ.Content/bin/iOS/Content
+          cp -R _c/Data ladxhd_game_source_code/ProjectZ.Core/Data
+          ls ladxhd_game_source_code/ProjectZ.Core/Data | head -5
 
       - name: Build app
         run: |
           cd ladxhd_game_source_code
           dotnet build ProjectZ.iOS/ProjectZ.iOS.csproj -c Release -r ios-arm64 \
-            -p:EnableCodeSigning=false -p:CodesignRequireProvisioningProfile=false -p:BuildIpa=false
+            -p:EnableCodeSigning=false -p:CodesignRequireProvisioningProfile=false -p:BuildIpa=false -v q -nowarn:CS8618,CS8604,CS8600,CA1416
 
-      - name: Package unsigned IPA
+      - name: Package unsigned IPA and encrypt
+        env:
+          ASSET_PASS: ${{ secrets.ASSET_PASS }}
         run: |
           APP=$(find ladxhd_game_source_code/ProjectZ.iOS/bin -name '*.app' -maxdepth 6 | head -1)
           echo "APP=$APP"
           mkdir -p Payload && cp -R "$APP" Payload/
           zip -qry LADXHD-unsigned.ipa Payload
           ls -lh LADXHD-unsigned.ipa
-
-      - name: Encrypt IPA (repo is public; artifacts are public)
-        env:
-          ASSET_PASS: ${{ secrets.ASSET_PASS }}
-        run: openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:ASSET_PASS -in LADXHD-unsigned.ipa -out LADXHD-unsigned.ipa.enc
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:ASSET_PASS -in LADXHD-unsigned.ipa -out LADXHD-unsigned.ipa.enc
 
       - uses: actions/upload-artifact@v4
         with:
