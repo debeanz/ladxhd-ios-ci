@@ -69,7 +69,7 @@ jobs:
       - name: Select newest Xcode
         run: |
           ls -d /Applications/Xcode_*.app
-          XC=/Applications/Xcode_26.2.app
+          XC=/Applications/Xcode_26.3.app
           sudo xcode-select -s "$XC"
           xcodebuild -version
 
