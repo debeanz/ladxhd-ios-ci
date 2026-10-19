@@ -38,9 +38,10 @@ jobs:
 
       - name: Migrate assets (build migrater from source, headless)
         run: |
-          dotnet publish ladxhd_migrate_source_code -c Release -o _mig
-          cp -R _mig/. .
-          dotnet Migrater.dll --migrate-assets
+          dotnet publish ladxhd_migrate_source_code -c Release -o _mig -v q -nowarn:CS8618,CS8604,CS8600,CA1416
+          mv _mig/Migrater.app .
+          ls Migrater.app/Contents/MacOS | head -3
+          ./Migrater.app/Contents/MacOS/Migrater --migrate-assets
           ls ladxhd_game_source_code/ProjectZ.Content/Content | head
           ls ladxhd_game_source_code/ProjectZ.Core/Data | head
 
