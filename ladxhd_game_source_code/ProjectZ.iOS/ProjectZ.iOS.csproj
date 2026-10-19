@@ -12,8 +12,6 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <IsTrimmable>false</IsTrimmable>
-    <PublishTrimmed>false</PublishTrimmed>
     <MtouchLink>None</MtouchLink>
     <UseInterpreter>true</UseInterpreter>
     <EnableCodeSigning>false</EnableCodeSigning>
